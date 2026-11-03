@@ -63,9 +63,12 @@ def transacoes_atipicas(transacoes, limiar=LIMIAR_ATIPICO) -> list[tuple[Transac
 N_CARTOES = 1001
 N_TRANSACOES = 1000
 LIMIAR_DUPLICADA = 1.0
+ATIPICAS_EXIBIDAS = 5
 def analisar(cartoes, transacoes) -> dict
 def executar(n_cartoes=N_CARTOES, n_transacoes=N_TRANSACOES) -> None
 ```
+
+`analisar` devolve as chaves `maioria`, `chamadas_dc`, `chamadas_forca_bruta`, `duplicada`, `suspeita_duplicada`, `media`, `desvio_padrao`, `mediana`, `mad` e `atipicas`.
 
 ## `src/benchmark.py`
 
@@ -73,8 +76,8 @@ def executar(n_cartoes=N_CARTOES, n_transacoes=N_TRANSACOES) -> None
 TAMANHOS = [100, 500, 1_000, 2_000, 5_000, 10_000, 50_000]
 LIMITE_FORCA_BRUTA = 5_000
 REPETICOES = 3
-def medir(funcao, repeticoes=REPETICOES) -> float    # mediana dos tempos
-def executar_benchmark() -> list[dict]
-def salvar_csv(resultados, caminho) -> None
-def salvar_grafico(resultados, caminho) -> None
+def medir(funcao, repeticoes=REPETICOES) -> float    # menor tempo entre as repetições
+def executar_benchmark(tamanhos=TAMANHOS, repeticoes=REPETICOES) -> list[dict]
+def salvar_csv(resultados, caminho=CAMINHO_CSV) -> None
+def salvar_grafico(resultados, caminho=CAMINHO_GRAFICO) -> None
 ```

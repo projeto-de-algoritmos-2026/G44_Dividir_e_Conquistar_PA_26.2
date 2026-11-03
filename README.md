@@ -152,6 +152,108 @@ Chamadas ao testador nos dados gerados (conta suspeita com 60% dos cartões):
   - todas as fraudes plantadas são marcadas, com no máximo 1% de outras transações, em ordem decrescente de escore;
   - o caso MAD = 0.
 
+## Saída
+
+`python src/main.py` gera os dados com a semente fixa (1.001 cartões e 1.000 transações) e imprime no terminal o relatório da investigação, em quatro partes:
+
+1. **Dados carregados:** quantos cartões e transações foram analisados e a semente.
+2. **Cartões apreendidos:** se existe uma conta com mais da metade dos cartões, quantos cartões ela tem e a porcentagem. Como a conta não pode ser lida, ela é identificada pelo cartão representante devolvido pelo algoritmo. Também mostra quantas chamadas ao testador o dividir e conquistar fez, contra a força bruta.
+3. **Cobrança duplicada:** as duas transações mais próximas em (minuto, valor), com id, cartão, horário e valor, a distância entre elas e se ela está abaixo do limiar de suspeita (1,0).
+4. **Valores atípicos:** média e desvio padrão (puxados pelas fraudes) contra mediana e MAD (robustos), quantas transações têm |escore robusto| > 3,5 e as 5 com maior escore.
+
+A função `analisar(cartoes, transacoes)` em [src/main.py](src/main.py) faz o mesmo trabalho sem imprimir e devolve um dicionário com todos os resultados, para os testes.
+
+## Exemplo de execução
+
+Saída real de `python src/main.py`:
+
+```text
+=== Detector de Fraude Bancária ===
+
+1. Dados carregados
+   1.001 cartões apreendidos e 1.000 transações da maquininha (semente 44)
+
+2. Cartões apreendidos: maioria por dividir e conquistar
+   A conta do cartão 7 tem 601 dos 1.001 cartões (60,0%): mais da metade
+   Chamadas ao testador: 9.717 (dividir e conquistar) x 1.002.001 (força bruta)
+
+3. Cobrança duplicada: par de pontos mais próximo
+   Transação 11: cartão 126, 00:14:58, R$ 148,25
+   Transação 12: cartão 126, 00:15:01, R$ 148,25
+   Distância = 0,050 (suspeita de cobrança duplicada)
+
+4. Valores atípicos: mediana das medianas + MAD
+   Média = R$ 249,41 e desvio padrão = R$ 1.105,12 (puxados pelas fraudes)
+   Mediana = R$ 153,01 e MAD = R$ 27,15
+   10 transações atípicas (|escore| > 3,5). As 5 maiores:
+     Transação 680: cartão 129, 16:16:33, R$ 18.016,46, escore 443,9
+     Transação 507: cartão 140, 11:47:09, R$ 16.627,11, escore 409,3
+     Transação 725: cartão 198, 17:18:16, R$ 14.527,77, escore 357,2
+     Transação 22: cartão 21, 00:28:16, R$ 13.862,11, escore 340,6
+     Transação 967: cartão 88, 23:15:15, R$ 10.126,94, escore 247,8
+```
+
+As três fraudes plantadas nos dados foram encontradas: a conta suspeita (60% dos cartões), a cobrança duplicada de R$ 148,25 com 3 segundos de diferença e as 10 transações de valor fraudulento, sem nenhum falso positivo.
+
+## Resultados experimentais
+
+[src/benchmark.py](src/benchmark.py) mede cada algoritmo de dividir e conquistar e a sua força bruta para n = 100, 500, 1.000, 2.000, 5.000, 10.000 e 50.000.
+
+- **Como foi medido:**
+  - cada tempo é o **menor de 3 execuções**, com o coletor de lixo desligado durante a medição, como faz o `timeit`;
+  - a geração das entradas fica fora da medição;
+  - as forças brutas O(n²) rodam só até n = 5.000; acima disso, levariam minutos;
+  - na mediana, a comparação é com "ordenar e pegar o meio" usando o `sorted()` do Python.
+- **Dados brutos:** [data/resultados_benchmark.csv](data/resultados_benchmark.csv).
+- **Ambiente:** os tempos absolutos variam entre máquinas.
+
+![Gráfico log-log do benchmark](data/resultados_benchmark.png)
+
+**Tempos (em milissegundos):**
+
+| n | Maioria D&C | Maioria força bruta | Par D&C | Par força bruta | Mediana das medianas | Ordenando (`sorted`) |
+|---:|---:|---:|---:|---:|---:|---:|
+| 100 | 0,29 | 1,91 | 0,25 | 1,28 | 0,05 | 0,004 |
+| 500 | 1,64 | 68,21 | 1,67 | 50,44 | 0,42 | 0,035 |
+| 1.000 | 4,04 | 240,72 | 4,13 | 148,38 | 0,90 | 0,099 |
+| 2.000 | 10,80 | 1.579,32 | 10,70 | 795,29 | 2,39 | 0,276 |
+| 5.000 | 27,88 | 15.880,52 | 47,71 | 8.072,73 | 11,31 | 1,133 |
+| 10.000 | 111,65 | — | 114,13 | — | 22,46 | 2,727 |
+| 50.000 | 510,79 | — | 916,80 | — | 98,07 | 18,865 |
+
+**Chamadas ao testador de equivalência (maioria):**
+
+| n | Dividir e conquistar | Força bruta | Força bruta ÷ D&C |
+|---:|---:|---:|---:|
+| 100 | 678 | 10.000 | 15x |
+| 500 | 4.366 | 250.000 | 57x |
+| 1.000 | 9.744 | 1.000.000 | 103x |
+| 2.000 | 21.524 | 4.000.000 | 186x |
+| 5.000 | 62.344 | 25.000.000 | 401x |
+| 10.000 | 134.014 | — | — |
+| 50.000 | 788.383 | — | — |
+
+**Crescimento medido x teoria** (quantas vezes o custo aumentou quando n cresceu):
+
+| Intervalo | Teoria | Maioria D&C (chamadas) | Maioria D&C (tempo) | Par D&C | Mediana das medianas | `sorted` |
+|---|---|---:|---:|---:|---:|---:|
+| 1.000 → 10.000 | n log n: 13,3x; n: 10x | 13,8x | 27,7x | 27,6x | 25,1x | 27,6x |
+| 10.000 → 50.000 | n log n: 5,9x; n: 5x | 5,9x | 4,6x | 8,0x | 4,4x | 6,9x |
+| 100 → 1.000 (força bruta) | n²: 100x | 100x | 125,9x | 115,8x | — | — |
+
+**Análise:**
+- **Contagem de chamadas:** é a medida mais limpa, porque não depende da máquina. As chamadas do dividir e conquistar crescem como n log n (13,8x contra 13,3x previstos, e 5,9x contra 5,9x). As da força bruta são exatamente n². Em n = 5.000, o dividir e conquistar faz 401 vezes menos chamadas.
+- **Ganho em tempo, em n = 5.000:** o dividir e conquistar é cerca de 570 vezes mais rápido na maioria e 170 vezes mais rápido no par mais próximo. A diferença aumenta com n, e as retas do gráfico se afastam porque as inclinações são diferentes: cerca de 1 para n log n e 2 para n².
+- **Crescimento acima da teoria entre 1.000 e 10.000:** os tempos cresceram cerca de 27x, o dobro do previsto. Isso também aconteceu com o `sorted()`, que é implementado em C e independe do nosso código. Por isso, o excesso vem da máquina, não dos algoritmos: com 1.000 elementos os dados cabem no cache do processador, e com 10.000 já não cabem. Entre 10.000 e 50.000, quando os dados já estão fora do cache nos dois tamanhos, os tempos voltam a acompanhar a teoria. O mesmo efeito explica a força bruta crescer um pouco acima de n² entre 1.000 e 5.000.
+- **Mediana em tempo absoluto:** o `sorted()` é mais rápido que a mediana das medianas, de 5 a 13 vezes nesta máquina. O motivo é que ele roda em C, enquanto a nossa implementação é Python puro, e a seleção linear tem uma constante alta (grupos, medianas e partição a cada nível), como diz o slide. O que o experimento confirma é o **crescimento**: 4,4x quando n cresce 5x, compatível com O(n), sem ordenar os dados.
+
+## Conclusão
+
+- **Maioria por dividir e conquistar:** respondeu se mais da metade dos cartões apreendidos é da mesma conta usando só o testador de equivalência, sem ler a conta, ordenar ou usar hash. A contagem de chamadas confirmou o O(n log n) previsto pela recorrência T(n) = 2T(n/2) + O(n): 62 mil chamadas contra 25 milhões da força bruta com 5.000 cartões.
+- **Par de pontos mais próximo:** tratando cada transação como o ponto (minuto, valor), encontrou a cobrança duplicada plantada (R$ 148,25 cobrados duas vezes em 3 segundos). Devolver os pontos já ordenados por y em cada chamada manteve o combinar linear e o total em O(n log n), contra O(n²) da força bruta.
+- **Mediana das medianas e MAD:** encontrou as 10 fraudes de valor sem nenhum falso positivo, enquanto o z-score com média e desvio padrão encontra só 7, porque as fraudes inflam o próprio desvio padrão. A seleção em O(n), garantida pelo pivô entre 3n/10 e 7n/10, calcula mediana e MAD sem ordenar os dados.
+- **Geral:** os três algoritmos resolvem partes diferentes da mesma investigação com a mesma ideia: dividir o problema, resolver as partes e combinar em tempo linear. Os testes conferem cada um contra a sua força bruta e cobrem os casos-limite. Os experimentos confirmam as complexidades previstas: com precisão na contagem de chamadas e, nos tempos, a menos de efeitos de cache que atingem igualmente o código em C.
+
 ## Estrutura do repositório
 
 ```
@@ -164,7 +266,10 @@ G44_Dividir_e_Conquistar_2026.2/
 │   ├── main.py          # fluxo completo do detector
 │   └── benchmark.py     # tempos D&C x força bruta, CSV e gráfico
 ├── tests/               # um arquivo de teste por módulo
-├── data/                # CSVs gerados (não versionados), exceto resultados_benchmark.*
+├── data/
+│   ├── resultados_benchmark.csv   # dados brutos do benchmark
+│   └── resultados_benchmark.png   # gráfico log-log
+│                                  # (os CSVs de exemplo gerados por src/dados.py não são versionados)
 ├── docs/
 │   └── assinaturas.md
 ├── requirements.txt
@@ -181,8 +286,39 @@ venv\Scripts\activate        # Linux/macOS: source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Como rodar
+
+Gerar CSVs de exemplo dos dados (n = 100 e 1.000, em `data/`):
+
+```bash
+python src/dados.py
+```
+
+Investigação completa (maioria, cobrança duplicada e valores atípicos), com o relatório no terminal:
+
+```bash
+python src/main.py
+```
+
+Benchmark (leva cerca de 2 minutos; salva `data/resultados_benchmark.csv` e `data/resultados_benchmark.png`):
+
+```bash
+python src/benchmark.py
+```
+
 ## Como rodar os testes
 
 ```bash
 python -m pytest -q
 ```
+
+## Checklist final
+
+- [x] Dependências declaradas em `requirements.txt`
+- [x] `python -m pytest -q` passa
+- [x] `python src/main.py` roda do zero
+- [x] `python src/benchmark.py` gera o CSV e o gráfico
+- [x] README com estratégia, recorrência, tempo e espaço dos três algoritmos
+- [x] README com entrada, saída, exemplo real, resultados experimentais e conclusão
+- [ ] Vídeo publicado e referenciado no README
+- [ ] Repositório público
