@@ -1,0 +1,11 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Dados gerados por src/dados.py; só os resultados do benchmark são versionados
+data/*.csv
+data/*.png
+!data/resultados_benchmark.csv
+!data/resultados_benchmark.png
