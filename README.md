@@ -11,6 +11,10 @@ Projeto da disciplina de Projeto e Análise de Algoritmos (Trabalho 3: Dividir e
 | André Ricardo Meyer de Melo | 231011097 |
 | Giovanni Dornelas Ferreira  | 232002664 |
 
+## Vídeo de apresentação
+
+Apresentação do trabalho : [https://youtu.be/ZZwrOSH4X4Q]
+
 ## Problema
 
 Um banco abriu uma investigação e tem dois conjuntos de dados: os **cartões apreendidos** com um suspeito e as **transações de um dia** de uma maquininha. O sistema responde três perguntas, cada uma com um algoritmo:
@@ -311,14 +315,3 @@ python src/benchmark.py
 ```bash
 python -m pytest -q
 ```
-
-## Checklist final
-
-- [x] Dependências declaradas em `requirements.txt`
-- [x] `python -m pytest -q` passa
-- [x] `python src/main.py` roda do zero
-- [x] `python src/benchmark.py` gera o CSV e o gráfico
-- [x] README com estratégia, recorrência, tempo e espaço dos três algoritmos
-- [x] README com entrada, saída, exemplo real, resultados experimentais e conclusão
-- [ ] Vídeo publicado e referenciado no README
-- [ ] Repositório público
