@@ -86,6 +86,33 @@ Chamadas ao testador nos dados gerados (conta suspeita com 60% dos cartões):
   - a conta suspeita é encontrada nos dados gerados;
   - para n = 1000, no máximo 2n⌈log₂ n⌉ + 2n chamadas, enquanto a força bruta faz n².
 
+### Par de pontos mais próximo (cobrança duplicada)
+
+- **Problema:** uma maquininha registrou n transações num dia. Uma cobrança duplicada (o cliente passou o cartão uma vez e foi cobrado duas) aparece como duas transações com o mesmo valor, registradas com poucos segundos de diferença. Cada transação vira um ponto **(minuto do dia, valor em R$)**, e a cobrança duplicada é o **par de pontos mais próximo**.
+- **Escala:** na distância euclidiana, 1 minuto pesa o mesmo que R$ 1. As diferenças que importam são pequenas nos dois eixos (segundos e centavos), então essa escala simples basta. Normalizar pelo mínimo e máximo seria pior, porque as fraudes de valor (até R$ 20.000) esticariam o eixo e esmagariam as diferenças de centavos. Nos dados gerados, a duplicada plantada é o par mais próximo até cerca de 1.000 transações, que é o volume de uma maquininha num dia.
+- **Estratégia** ([src/par_proximo.py](src/par_proximo.py)):
+  - **Preparar:** ordenar os pontos por x uma única vez, guardando o índice original de cada um. Custa O(n log n).
+  - **Dividir:** traçar uma linha vertical x = x_linha com metade dos pontos de cada lado.
+  - **Conquistar:** achar recursivamente o par mais próximo de cada metade. Seja δ a menor das duas distâncias.
+  - **Combinar:** procurar um par que cruze a linha com distância menor que δ. Só os pontos a menos de δ da linha podem formar esse par (a faixa de largura 2δ). Percorrendo a faixa em ordem de y, cada ponto só precisa ser comparado com os seguintes enquanto a diferença em y for menor que δ.
+  - **Casos base:** com até 3 pontos, compara todos os pares.
+- **Por que no máximo 7 vizinhos:** divida a faixa em caixas de δ/2 × δ/2. Dois pontos da mesma metade na mesma caixa estariam a menos de δ um do outro, o que contradiz a definição de δ. Logo cada caixa tem no máximo um ponto de cada metade. Um ponto a menos de δ acima de outro está nas duas linhas de caixas seguintes, que somam 8 caixas, então há no máximo 7 vizinhos a examinar. A varredura da faixa custa O(n).
+- **Por que devolver a lista ordenada por y:** se cada nível reordenasse a faixa por y, o combinar custaria O(n log n) e o total seria O(n log² n). Em vez disso, cada chamada recursiva também devolve seus pontos ordenados por y, e o combinar faz o **merge** das duas listas em O(n), como no mergesort.
+- **Recorrência:** T(n) = 2T(n/2) + O(n): duas metades, mais o merge por y e a varredura da faixa, ambos lineares.
+- **Tempo:** pelo Teorema Mestre (caso 2), **O(n log n)**, somando a ordenação inicial por x.
+- **Espaço:** O(n) nas listas de cada nível, mais a pilha de recursão de profundidade O(log n).
+- **Força bruta:** comparar todos os n(n-1)/2 pares, O(n²). Usada só como oráculo nos testes e como comparação de custo.
+- **Resultado nos dados gerados (n = 1000):** transações 11 e 12, ambas do cartão 126, de R$ 148,25, às 00:14:58 e 00:15:01. A distância é 0,05, que corresponde aos 3 segundos entre elas.
+- **Testes** ([tests/test_par_proximo.py](tests/test_par_proximo.py)):
+  - 2 e 3 pontos;
+  - pontos colineares;
+  - pontos repetidos (distância 0);
+  - todos os pontos com o mesmo x;
+  - par que cruza a linha divisória;
+  - menos de 2 pontos (erro);
+  - mesma distância da força bruta para n de 2 a 300, com pontos reais aleatórios e com uma grade pequena de inteiros, que força x repetidos, pontos iguais e pontos sobre a linha;
+  - a cobrança duplicada plantada é encontrada.
+
 ## Estrutura do repositório
 
 ```
