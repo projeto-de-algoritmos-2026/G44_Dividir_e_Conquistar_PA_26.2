@@ -113,6 +113,45 @@ Chamadas ao testador nos dados gerados (conta suspeita com 60% dos cartões):
   - mesma distância da força bruta para n de 2 a 300, com pontos reais aleatórios e com uma grade pequena de inteiros, que força x repetidos, pontos iguais e pontos sobre a linha;
   - a cobrança duplicada plantada é encontrada.
 
+### Mediana das medianas e MAD (valores atípicos)
+
+- **Problema:** encontrar as transações com valor fora do padrão. O caminho clássico mede quantos desvios padrão cada valor está da média (z-score). Só que a média e o desvio padrão são puxados pelas próprias fraudes que queremos encontrar. A mediana e o **MAD** (mediana dos desvios absolutos em relação à mediana) quase não se mexem.
+- **Exemplo nos dados gerados (1.000 transações, 10 fraudes de valor):**
+
+  | | Média | Desvio padrão | Mediana | MAD |
+  |---|---:|---:|---:|---:|
+  | Só transações normais | R$ 151,64 | R$ 39,49 | R$ 152,19 | R$ 26,80 |
+  | Com as 10 fraudes | R$ 249,41 | R$ 1.105,12 | R$ 153,01 | R$ 27,15 |
+
+  As fraudes multiplicaram o desvio padrão por 28, e o z-score clássico (|z| > 3,5) encontra só **7 das 10** fraudes: elas se escondem atrás do desvio que elas mesmas inflaram. Com mediana e MAD, o escore robusto encontra **as 10**, e nenhuma transação normal é marcada.
+- **Por que seleção linear:** a mediana é o elemento de posição n/2 da lista ordenada. Ordenar custa O(n log n), mas achar um único elemento de posição k não exige ordenar tudo: o algoritmo de seleção com mediana das medianas faz isso em **O(n) no pior caso**.
+- **Estratégia** de `selecionar(valores, k)` ([src/mediana.py](src/mediana.py)), que devolve o k-ésimo menor valor:
+  1. **Dividir** os valores em grupos de 5.
+  2. Achar a **mediana de cada grupo**. Ordenar 5 elementos custa uma constante, então o passo todo é O(n).
+  3. Achar, recursivamente, a **mediana dessas medianas** (cerca de n/5 valores). Ela é o pivô.
+  4. **Particionar** em menores que o pivô, iguais ao pivô e maiores que o pivô. Separar os iguais garante que a recursão diminui mesmo com muitos valores repetidos.
+  5. **Descer só no lado que contém k:** nos menores, no pivô (se k cai entre os iguais) ou nos maiores, com k ajustado.
+- **Por que o pivô fica entre 3n/10 e 7n/10:** há n/5 grupos, e o pivô é a mediana das medianas, então metade dos grupos (n/10) tem mediana menor ou igual ao pivô. Em cada um desses grupos, 3 dos 5 elementos (a mediana e os dois menores que ela) são menores ou iguais ao pivô. Logo pelo menos 3 · n/10 = 3n/10 elementos são ≤ pivô e, pelo mesmo argumento, pelo menos 3n/10 são ≥ pivô. O lado em que a recursão desce tem, portanto, no máximo 7n/10 elementos.
+- **Recorrência:** T(n) ≤ T(n/5) + T(7n/10) + O(n).
+  - T(n/5): achar a mediana das medianas (passo 3).
+  - T(7n/10): descer no lado escolhido (passo 5), no pior caso.
+  - O(n): grupos, medianas dos grupos e partição.
+- **Tempo:** como n/5 + 7n/10 = 9n/10 < n, cada nível da recursão processa no máximo 9/10 do anterior. Os custos formam uma série geométrica de razão 9/10, limitada por 10 · cn. Logo T(n) = **O(n)**.
+- **Por que grupos de 3 não dão tempo linear** (pergunta do slide): com grupos de 3, a mesma contagem garante só n/3 elementos de cada lado do pivô, e a recorrência vira T(n) ≤ T(n/3) + T(2n/3) + O(n). Agora n/3 + 2n/3 = n: cada nível ainda custa O(n), há O(log n) níveis, e o total é O(n log n), igual a ordenar. Com grupos de 5 a soma fica abaixo de n, e é isso que faz a série convergir. Grupos de 7 também dariam tempo linear, com uma constante diferente.
+- **MAD e escore robusto:** `desvio_absoluto_mediano` calcula a mediana, depois os desvios |v − mediana| e depois a mediana desses desvios. São duas seleções lineares, então continua O(n). O escore robusto de cada transação é z = 0,6745 · (valor − mediana) / MAD (Iglewicz e Hoaglin). A constante 0,6745 deixa o MAD na mesma escala do desvio padrão para dados normais. Transações com |z| > 3,5 são marcadas como atípicas. Se o MAD for 0 (mais da metade dos valores iguais), qualquer valor diferente da mediana é atípico.
+- **Espaço:** O(n) nas listas da partição e nas medianas dos grupos, mais a pilha de recursão de profundidade O(log n).
+- **Força bruta:** ordenar todos os valores e pegar o do meio, O(n log n).
+- **Testes** ([tests/test_mediana.py](tests/test_mediana.py)):
+  - `selecionar` igual a `sorted(valores)[k]` para n de 1 a 500, com vários k (a ordenação aparece só no teste, como oráculo);
+  - muitos valores repetidos, todos iguais, um elemento, lista já ordenada e invertida;
+  - a lista original não é alterada;
+  - erros para k fora do intervalo e lista vazia;
+  - mediana com n par e ímpar;
+  - MAD de um exemplo conhecido;
+  - um outlier enorme puxa a média e não a mediana;
+  - todas as fraudes plantadas são marcadas, com no máximo 1% de outras transações, em ordem decrescente de escore;
+  - o caso MAD = 0.
+
 ## Estrutura do repositório
 
 ```
